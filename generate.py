@@ -25,7 +25,7 @@ except:  # noqa: E722
 def main(
     load_8bit: bool = False,
     base_model: str = "cerebras/Cerebras-GPT-6.7B",
-    lora_weights: str = "./lora_alpaca_cerebras",
+    lora_weights: str = "bjoernp/alpaca-cerebras-6.7B",
     prompt_template: str = "",  # The prompt template to use, will default to alpaca.
     server_name: str = "0.0.0.0",  # Allows to listen on all interfaces by providing '0.
     share_gradio: bool = False,
