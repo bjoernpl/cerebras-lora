@@ -1,3 +1,4 @@
+# Code based on https://github.com/tloen/alpaca-lora/blob/main/finetune.py alpaca fine-tuning script
 import os
 import sys
 from typing import List
@@ -7,11 +8,6 @@ import torch
 import transformers
 from datasets import load_dataset
 
-"""
-Unused imports:
-import torch.nn as nn
-import bitsandbytes as bnb
-"""
 
 from peft import (
     LoraConfig,
@@ -20,16 +16,16 @@ from peft import (
     prepare_model_for_int8_training,
     set_peft_model_state_dict,
 )
-from transformers import LlamaForCausalLM, LlamaTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from utils.prompter import Prompter
 
 
 def train(
     # model/data params
-    base_model: str = "",  # the only required argument
-    data_path: str = "yahma/alpaca-cleaned",
-    output_dir: str = "./lora-alpaca",
+    base_model: str = "cerebras/Cerebras-GPT-6.7B",  # the only required argument
+    data_path: str = "alpaca_data_cleaned.json",
+    output_dir: str = "./lora_alpaca_cerebras",
     # training hyperparams
     batch_size: int = 128,
     micro_batch_size: int = 4,
@@ -41,10 +37,6 @@ def train(
     lora_r: int = 8,
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
-    lora_target_modules: List[str] = [
-        "q_proj",
-        "v_proj",
-    ],
     # llm hyperparams
     train_on_inputs: bool = True,  # if False, masks out inputs in loss
     group_by_length: bool = False,  # faster, but produces an odd training loss curve
@@ -71,7 +63,6 @@ def train(
             f"lora_r: {lora_r}\n"
             f"lora_alpha: {lora_alpha}\n"
             f"lora_dropout: {lora_dropout}\n"
-            f"lora_target_modules: {lora_target_modules}\n"
             f"train_on_inputs: {train_on_inputs}\n"
             f"group_by_length: {group_by_length}\n"
             f"wandb_project: {wandb_project}\n"
@@ -107,14 +98,8 @@ def train(
     if len(wandb_log_model) > 0:
         os.environ["WANDB_LOG_MODEL"] = wandb_log_model
 
-    model = LlamaForCausalLM.from_pretrained(
-        base_model,
-        load_in_8bit=True,
-        torch_dtype=torch.float16,
-        device_map=device_map,
-    )
-
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, device_map='auto', load_in_8bit=True)
 
     tokenizer.pad_token_id = (
         0  # unk. we want this to be different from the eos token
@@ -169,7 +154,6 @@ def train(
     config = LoraConfig(
         r=lora_r,
         lora_alpha=lora_alpha,
-        target_modules=lora_target_modules,
         lora_dropout=lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",
