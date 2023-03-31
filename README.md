@@ -13,6 +13,18 @@ as well as Tim Dettmers' [bitsandbytes](https://github.com/TimDettmers/bitsandby
 
 Without hyperparameter tuning, the LoRA model produces outputs comparable to the Stanford Alpaca model. (Please see the outputs included below.) Further tuning might be able to achieve better performance; I invite interested users to give it a try and report their results.
 
+### Quickstart with 🤗Transformers:
+
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from peft import PeftModel
+tokenizer = AutoTokenizer.from_pretrained("cerebras/Cerebras-GPT-6.7B")
+model = AutoModelForCausalLM.from_pretrained("cerebras/Cerebras-GPT-6.7B", torch_dtype=torch.float16, device_map='auto', load_in_8bit=True)
+model = PeftModel.from_pretrained(model, "bjoernp/alpaca-cerebras-6.7B", torch_dtype=torch.float16, device_map='auto')
+pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
+generated_text = pipe("Tell me about alpacas.", max_length=50, do_sample=False, no_repeat_ngram_size=2)[0]
+```
+
 ### Local Setup
 
 1. Install dependencies
@@ -29,36 +41,6 @@ This file contains a straightforward application of PEFT to the LLaMA model,
 as well as some code related to prompt construction and tokenization.
 PRs adapting this code to support larger models are always welcome.
 
-Example usage:
-
-```bash
-python finetune.py \
-    --base_model 'decapoda-research/llama-7b-hf' \
-    --data_path 'yahma/alpaca-cleaned' \
-    --output_dir './lora-alpaca'
-```
-
-We can also tweak our hyperparameters:
-
-```bash
-python finetune.py \
-    --base_model 'decapoda-research/llama-7b-hf' \
-    --data_path 'yahma/alpaca-cleaned' \
-    --output_dir './lora-alpaca' \
-    --batch_size 128 \
-    --micro_batch_size 4 \
-    --num_epochs 3 \
-    --learning_rate 1e-4 \
-    --cutoff_len 512 \
-    --val_set_size 2000 \
-    --lora_r 8 \
-    --lora_alpha 16 \
-    --lora_dropout 0.05 \
-    --lora_target_modules '[q_proj,v_proj]' \
-    --train_on_inputs \
-    --group_by_length
-```
-
 ### Inference (`generate.py`)
 
 This file reads the foundation model from the Hugging Face model hub and the LoRA weights from `tloen/alpaca-lora-7b`, and runs a Gradio interface for inference on a specified input. Users should treat this as example code for the use of the model, and modify it as needed.
@@ -68,33 +50,19 @@ Example usage:
 ```bash
 python generate.py \
     --load_8bit \
-    --base_model 'decapoda-research/llama-7b-hf' \
-    --lora_weights 'tloen/alpaca-lora-7b'
+    --base_model 'cerebras/Cerebras-GPT-6.7B' \
+    --lora_weights 'bjoernp/alpaca-cerebras-6.7B'
 ```
 
 ### Official weights
 
-The most recent "official" Alpaca-LoRA adapter available at [`tloen/alpaca-lora-7b`](https://huggingface.co/tloen/alpaca-lora-7b) was trained on March 26 with the following command:
+The most recent Alpaca-LoRA adapter available at [`bjoernp/alpaca-cerebras-6.7B`](https://huggingface.co/bjoernp/alpaca-cerebras-6.7B) was trained on March 30 with the following command:
 
 ```bash
-python finetune.py \
-    --base_model='decapoda-research/llama-7b-hf' \
-    --num_epochs=10 \
-    --cutoff_len=512 \
-    --group_by_length \
-    --output_dir='./lora-alpaca' \
-    --lora_target_modules='[q_proj,k_proj,v_proj,o_proj]' \
-    --lora_r=16 \
-    --micro_batch_size=8
+python finetune.py
 ```
 
-### Checkpoint export (`export_*_checkpoint.py`)
-
-These files contain scripts that merge the LoRA weights back into the base model
-for export to Hugging Face format and to PyTorch `state_dicts`.
-They should help users
-who want to run inference in projects like [llama.cpp](https://github.com/ggerganov/llama.cpp)
-or [alpaca.cpp](https://github.com/antimatter15/alpaca.cpp).
+Finetuning took ~5.5 hours on a 3090Ti
 
 ### Docker Setup & Inference
 
